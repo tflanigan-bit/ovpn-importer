@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OVPN Certificate Extractor</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --panel: #13161f;
+    --border: #1e2535;
+    --accent: #00e5ff;
+    --accent2: #7b61ff;
+    --success: #00e676;
+    --warn: #ffab40;
+    --text: #c9d1e8;
+    --muted: #5a6480;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Outfit', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 80% 10%, rgba(0,229,255,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 10% 80%, rgba(123,97,255,0.06) 0%, transparent 60%);
+  }
+
+  header {
+    max-width: 780px;
+    margin: 0 auto 2.5rem;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 300;
+    margin-left: 52px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem;
+    max-width: 780px;
+    margin: 0 auto 1.5rem;
+  }
+
+  .card-title {
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  /* DROP ZONE */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.dragging {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.04);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    display: block;
+    filter: grayscale(0.3);
+  }
+
+  .drop-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.35rem;
+  }
+
+  .drop-sub {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  /* RESULT PANEL */
+  #results {
+    display: none;
+  }
+
+  .cert-block {
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .cert-block.client {
+    border-left-color: var(--accent2);
+  }
+
+  .cert-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+
+  .cert-block.client .cert-label { color: var(--accent2); }
+
+  .cert-preview {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 120px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .cert-preview::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, #0a0c11);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1.1rem;
+    border-radius: 7px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 0.83rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #33eaff; transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: rgba(123,97,255,0.15);
+    color: var(--accent2);
+    border: 1px solid rgba(123,97,255,0.3);
+  }
+  .btn-secondary:hover { background: rgba(123,97,255,0.25); }
+
+  .btn-ghost {
+    background: var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: #252c3d; }
+
+  /* STATUS */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-family: var(--mono);
+    margin-bottom: 1.5rem;
+  }
+
+  .status-ok { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: var(--success); }
+  .status-warn { background: rgba(255,171,64,0.08); border: 1px solid rgba(255,171,64,0.2); color: var(--warn); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  /* INSTRUCTIONS */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .steps li::before {
+    content: counter(step);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.25);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .steps li .step-text {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .steps li .step-text strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    background: rgba(0,229,255,0.08);
+    color: var(--accent);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  .path {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    color: var(--warn);
+    padding: 0.5rem 0.9rem;
+    border-radius: 6px;
+    margin: 0.5rem 0 0.25rem;
+    display: block;
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+
+  .tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab.support-tab.active {
+    color: var(--warn);
+    border-bottom-color: var(--warn);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.25rem 0;
+  }
+
+  .note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.6;
+    padding: 0.75rem 1rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border-left: 2px solid var(--muted);
+    margin-top: 1rem;
+  }
+
+  .note.warn { border-left-color: var(--warn); background: rgba(255,171,64,0.05); color: #e0b070; }
+  .note.ok   { border-left-color: var(--success); background: rgba(0,230,118,0.05); color: #70d090; }
+
+  .none-found {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    padding: 2rem;
+  }
+
+  .reset-btn {
+    display: block;
+    margin: 1rem auto 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .reset-btn:hover { color: var(--text); }
+
+  /* ACCORDION */
+  .accordion { display: flex; flex-direction: column; gap: 0.6rem; }
+
+  .acc-item {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .acc-item.open { border-color: rgba(255,171,64,0.35); }
+
+  .acc-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.1rem;
+    cursor: pointer;
+    background: rgba(255,255,255,0.02);
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .acc-header:hover { background: rgba(255,255,255,0.04); }
+
+  .acc-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .acc-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #dce3f5;
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .acc-badge {
+    font-size: 0.68rem;
+    font-family: var(--mono);
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .badge-err  { background: rgba(255,80,80,0.12); color: #ff7070; border: 1px solid rgba(255,80,80,0.25); }
+  .badge-warn { background: rgba(255,171,64,0.12); color: var(--warn); border: 1px solid rgba(255,171,64,0.25); }
+  .badge-info { background: rgba(0,229,255,0.1); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+  .badge-lock { background: rgba(123,97,255,0.12); color: var(--accent2); border: 1px solid rgba(123,97,255,0.25); }
+
+  .acc-chevron {
+    font-size: 0.65rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .acc-item.open .acc-chevron { transform: rotate(180deg); }
+
+  .acc-body {
+    display: none;
+    padding: 0 1.1rem 1.1rem;
+    font-size: 0.87rem;
+    line-height: 1.7;
+    color: var(--text);
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+  }
+  .acc-item.open .acc-body { display: block; }
+
+  .acc-body .steps { margin-top: 0.9rem; }
+  .acc-body .note  { margin-top: 0.9rem; }
+  .acc-body p { margin-top: 0.75rem; }
+  .acc-body p:first-child { margin-top: 0.85rem; }
+
+  .fix-label {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--success);
+    margin-top: 0.9rem;
+    margin-bottom: 0.3rem;
+    opacity: 0.8;
+  }
+
+  @media (max-width: 500px) {
+    .btn { font-size: 0.78rem; padding: 0.45rem 0.9rem; }
+    h1 { font-size: 1.3rem; }
+    .tab { font-size: 0.75rem; padding: 0.45rem 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-row">
+    <div class="logo-icon">🔐</div>
+    <h1>OVPN Cert Extractor</h1>
+  </div>
+  <p class="subtitle">Extract &amp; import CA certificates from .ovpn files — Chromebook ready</p>
+</header>
+
+<!-- UPLOAD -->
+<div class="card" id="uploadCard">
+  <div class="card-title">Upload Configuration</div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".ovpn,.conf,.txt">
+    <span class="drop-icon">📂</span>
+    <div class="drop-label">Drop your .ovpn file here</div>
+    <div class="drop-sub">or click to browse — file never leaves your device</div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="results">
+
+  <div class="card">
+    <div class="card-title">Extracted Certificates</div>
+    <div id="statusBar"></div>
+    <div id="certList"></div>
+    <button class="reset-btn" onclick="resetTool()">↩ Load a different file</button>
+  </div>
+
+  <div class="card" id="instructionsCard">
+    <div class="card-title">Chromebook Import Instructions</div>
+
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('crt', this)">Method A — .crt file</div>
+      <div class="tab" onclick="switchTab('settings', this)">Method B — Settings UI</div>
+      <div class="tab support-tab" onclick="switchTab('support', this)">🆘 Support</div>
+    </div>
+
+    <!-- METHOD A -->
+    <div class="tab-content active" id="tab-crt">
+      <p style="font-size:0.88rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.6;">
+        Download the <strong style="color:#fff">.crt file</strong> above, then follow these steps on your Chromebook:
+      </p>
+      <ol class="steps">
+        <li><div class="step-text">Open the <strong>Files</strong> app and locate the downloaded <code>.crt</code> file (usually in <code>Downloads</code>).</div></li>
+        <li><div class="step-text"><strong>Double-click</strong> the <code>.crt</code> file. ChromeOS should recognise it as a certificate and open the import dialog automatically.</div></li>
+        <li><div class="step-text">A dialog will appear — click <strong>Import</strong>.</div></li>
+        <li><div class="step-text">When asked where to trust it, choose <strong>"For VPN and apps"</strong> (or <strong>"Authorities"</strong> if shown).</div></li>
+        <li><div class="step-text">Click <strong>OK / Done</strong>. The certificate is now installed.</div></li>
+        <li><div class="step-text">Configure your VPN at <strong>Settings → Network → VPN → Add VPN</strong> and select this certificate when prompted.</div></li>
+      </ol>
+      <div class="note">💡 If double-clicking does nothing or shows an error, switch to <strong>Method B</strong> or check the <strong>🆘 Support</strong> tab.</div>
+    </div>
+
+    <!-- METHOD B -->
+    <div class="tab-content" id="tab-settings">
+      <p style="font-size:0.88rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.6;">
+        Import manually via the ChromeOS Certificate Manager — works on all Chromebook versions:
+      </p>
+      <ol class="steps">
+        <li>
+          <div class="step-text">
+            Open <strong>Chrome browser</strong> and go to:<br>
+            <code class="path">chrome://certificate-manager/</code>
+            <span style="font-size:0.78rem;color:var(--muted);">(ChromeOS 117+)</span><br>
+            <em style="font-size:0.78rem;color:var(--muted);">On older versions use:</em>
+            <code class="path">chrome://settings/certificates</code>
+          </div>
+        </li>
+        <li><div class="step-text">Click the <strong>Authorities</strong> tab — this is where CA / root certificates live.</div></li>
+        <li><div class="step-text">Click <strong>Import</strong> and select your downloaded <code>.crt</code> file.</div></li>
+        <li>
+          <div class="step-text">
+            In the trust dialog, check:<br>
+            ✅ <strong>Trust this certificate for identifying websites</strong><br>
+            ✅ <strong>Trust this certificate for identifying VPN and app users</strong>
+          </div>
+        </li>
+        <li><div class="step-text">Click <strong>OK</strong> — the cert should appear in the Authorities list.</div></li>
+        <li><div class="step-text">Go to <strong>Settings → Network → Add connection → OpenVPN / L2TP</strong> — your CA cert will be in the dropdown.</div></li>
+      </ol>
+      <div class="note warn">⚠ <strong>Managed Chromebook?</strong> If enrolled by a school or employer, certificate imports may be blocked. You'll need your IT admin to push it via Google Admin Console.</div>
+    </div>
+
+    <!-- SUPPORT TAB -->
+    <div class="tab-content" id="tab-support">
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1.1rem;line-height:1.6;">Click any issue below that matches what you're seeing:</p>
+
+      <div class="accordion">
+
+        <!-- 1 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">😶</span>
+            <span class="acc-title">Double-clicking the .crt file does absolutely nothing</span>
+            <span class="acc-badge badge-err">common</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>ChromeOS sometimes loses file-type association for <code>.crt</code> files. Instead of double-clicking, import it directly through Chrome:</p>
+            <span class="fix-label">→ Fix</span>
+            <ol class="steps">
+              <li><div class="step-text">Open Chrome and type <code>chrome://certificate-manager/</code> in the address bar.</div></li>
+              <li><div class="step-text">Go to the <strong>Authorities</strong> tab → click <strong>Import</strong>.</div></li>
+              <li><div class="step-text">Navigate to your <code>Downloads</code> folder and select the <code>.crt</code> file.</div></li>
+              <li><div class="step-text">Check both trust boxes and click <strong>OK</strong>.</div></li>
+            </ol>
+            <div class="note">On ChromeOS 117+ you may also see a newer certificate manager at <code>chrome://certificate-manager/</code> — try that first, and fall back to <code>chrome://settings/certificates</code> if it looks unfamiliar.</div>
+          </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🚫</span>
+            <span class="acc-title">"File not supported" or "Invalid certificate" error</span>
+            <span class="acc-badge badge-err">error</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>This usually means the file isn't a proper PEM certificate, or it has extra characters. A valid PEM file looks exactly like:</p>
+            <code class="path">-----BEGIN CERTIFICATE-----
+MIIDxTCCAq2gAwIBAgIUABC...
+(many lines of base64)
+-----END CERTIFICATE-----</code>
+            <span class="fix-label">→ Fix</span>
+            <ol class="steps">
+              <li><div class="step-text">Use the <strong>Copy PEM</strong> button above and paste it into a plain text editor (e.g. the <strong>Text</strong> app on Chromebook).</div></li>
+              <li><div class="step-text">Check that the first line is exactly <code>-----BEGIN CERTIFICATE-----</code> with no extra spaces or characters.</div></li>
+              <li><div class="step-text">Check that the last line is exactly <code>-----END CERTIFICATE-----</code>.</div></li>
+              <li><div class="step-text">Save the file with a <code>.crt</code> extension and try importing again.</div></li>
+            </ol>
+            <div class="note warn">⚠ If the cert block starts with <code>-----BEGIN X509 CERTIFICATE-----</code>, rename the header/footer to just <code>-----BEGIN CERTIFICATE-----</code> / <code>-----END CERTIFICATE-----</code> — ChromeOS requires standard PEM format.</div>
+          </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔘</span>
+            <span class="acc-title">Import button is greyed out in Certificate Manager</span>
+            <span class="acc-badge badge-warn">managed</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>A greyed-out Import button means your Chromebook is <strong>managed by an organization</strong> (school, employer, etc.) and certificate imports are restricted by policy.</p>
+            <span class="fix-label">→ Options</span>
+            <ol class="steps">
+              <li><div class="step-text">Contact your <strong>IT administrator</strong> and ask them to push the CA certificate through <strong>Google Admin Console → Devices → Networks → Certificates</strong>.</div></li>
+              <li><div class="step-text">If you manage the domain yourself: in Google Admin Console, go to <strong>Devices → Chrome → Settings → User &amp; Browser Settings → Security → Certificate Management</strong> and enable user certificate imports.</div></li>
+              <li><div class="step-text">Alternatively, if you have a personal Google account on the device, switch to it — personal accounts may have import access even on managed hardware.</div></li>
+            </ol>
+            <div class="note">If this is a personal Chromebook and the button is still greyed out, try signing out and back in, or check if Developer Mode is accidentally on (it can affect permissions).</div>
+          </div>
+        </div>
+
+        <!-- 4 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">📋</span>
+            <span class="acc-title">"Certificate already exists" when importing</span>
+            <span class="acc-badge badge-info">info</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>Good news — this actually means the certificate is <strong>already installed</strong>! You don't need to import it again.</p>
+            <span class="fix-label">→ What to do</span>
+            <ol class="steps">
+              <li><div class="step-text">Go to <code>chrome://certificate-manager/</code> → <strong>Authorities</strong> tab and look for your VPN provider's certificate name in the list to confirm it's there.</div></li>
+              <li><div class="step-text">Proceed directly to setting up your VPN: <strong>Settings → Network → Add connection → OpenVPN / L2TP</strong>.</div></li>
+              <li><div class="step-text">In the VPN config, select the CA cert from the dropdown — it should now appear.</div></li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- 5 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔍</span>
+            <span class="acc-title">Certificate was imported but doesn't appear in the VPN dropdown</span>
+            <span class="acc-badge badge-warn">vpn</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>ChromeOS VPN setup only shows certificates that were trusted specifically <strong>"For VPN and apps"</strong> — if you picked a different trust level during import, it won't show up.</p>
+            <span class="fix-label">→ Fix</span>
+            <ol class="steps">
+              <li><div class="step-text">Go to <code>chrome://certificate-manager/</code> → <strong>Authorities</strong> tab.</div></li>
+              <li><div class="step-text">Find the certificate, click the <strong>⋮ menu</strong> next to it → <strong>Edit</strong>.</div></li>
+              <li><div class="step-text">Make sure <strong>"Trust this certificate for identifying VPN and app users"</strong> is checked.</div></li>
+              <li><div class="step-text">Save → go back to the VPN setup. The cert should now appear in the dropdown.</div></li>
+            </ol>
+            <div class="note">If you don't see an Edit option, delete the certificate and re-import it, making sure to check both trust boxes this time.</div>
+          </div>
+        </div>
+
+        <!-- 6 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🌐</span>
+            <span class="acc-title">VPN connects but there's no internet / traffic doesn't route</span>
+            <span class="acc-badge badge-warn">vpn</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>The certificate is fine — this is a VPN <strong>routing or configuration issue</strong>, not a cert problem.</p>
+            <span class="fix-label">→ Things to check</span>
+            <ol class="steps">
+              <li><div class="step-text">Make sure <strong>Send all traffic through VPN</strong> is enabled in the VPN settings on ChromeOS (toggle in the VPN connection details).</div></li>
+              <li><div class="step-text">Verify your VPN server address, username, and password are correct — a typo here can cause connections that "succeed" but don't pass traffic.</div></li>
+              <li><div class="step-text">Check that your VPN provider's server isn't down — try their status page or a different server if available.</div></li>
+              <li><div class="step-text">If the server uses a <strong>custom port</strong>, make sure it's entered correctly in the VPN settings (e.g. <code>1194</code> for OpenVPN UDP, <code>443</code> for TCP).</div></li>
+            </ol>
+            <div class="note warn">⚠ ChromeOS's built-in VPN client only supports <strong>L2TP/IPSec</strong> and basic <strong>OpenVPN</strong>. If your VPN requires advanced OpenVPN features (tls-crypt, data-ciphers, etc.), you may need the <strong>OpenVPN for Chrome</strong> extension or an Android VPN app instead.</div>
+          </div>
+        </div>
+
+        <!-- 7 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔎</span>
+            <span class="acc-title">No certificates were extracted from my .ovpn file</span>
+            <span class="acc-badge badge-info">extractor</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>Some .ovpn files don't embed certificates directly — instead they reference <strong>external files</strong> using lines like:</p>
+            <code class="path">ca /etc/openvpn/ca.crt
+cert /etc/openvpn/client.crt
+key /etc/openvpn/client.key</code>
+            <span class="fix-label">→ What to do</span>
+            <ol class="steps">
+              <li><div class="step-text">Open your <code>.ovpn</code> file in a text editor and look for lines starting with <code>ca</code>, <code>cert</code>, or <code>key</code> — they'll point to separate files.</div></li>
+              <li><div class="step-text">Your VPN provider should have sent those <code>.crt</code> / <code>.pem</code> files alongside the <code>.ovpn</code> — import those directly.</div></li>
+              <li><div class="step-text">If you only have the <code>.ovpn</code> file, contact your VPN provider and ask for the <strong>CA certificate file</strong> separately.</div></li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- 8 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔌</span>
+            <span class="acc-title">No "OpenVPN / L2TP" option appears in ChromeOS network settings</span>
+            <span class="acc-badge badge-info">setup</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>The exact location of VPN settings varies slightly by ChromeOS version. Here's how to find it:</p>
+            <span class="fix-label">→ Where to look</span>
+            <ol class="steps">
+              <li><div class="step-text">Click the <strong>clock / system tray</strong> in the bottom-right → click the <strong>gear icon</strong> (Settings).</div></li>
+              <li><div class="step-text">Go to <strong>Network</strong> → scroll down to the <strong>VPN</strong> section → click <strong>Add VPN</strong> or the <strong>+</strong> icon.</div></li>
+              <li><div class="step-text">You should see options for <strong>OpenVPN / L2TP</strong> and possibly WireGuard. Select <strong>OpenVPN / L2TP</strong>.</div></li>
+              <li><div class="step-text">If you only see WireGuard or nothing useful, your ChromeOS may be outdated — go to <strong>Settings → About ChromeOS → Check for updates</strong>.</div></li>
+            </ol>
+            <div class="note">Alternatively, try navigating to <code>chrome://os-settings/networks?type=VPN</code> directly in the Chrome address bar.</div>
+          </div>
+        </div>
+
+        <!-- 9 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">⚙️</span>
+            <span class="acc-title">ChromeOS VPN doesn't support my VPN's features — advanced config</span>
+            <span class="acc-badge badge-lock">advanced</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>The built-in ChromeOS VPN client is quite basic. If your <code>.ovpn</code> uses features like <code>tls-crypt</code>, <code>tls-auth</code>, <code>data-ciphers</code>, or <code>fragment</code>, it likely won't work natively. You have two better options:</p>
+            <span class="fix-label">→ Option 1: Android VPN app (easiest)</span>
+            <ol class="steps">
+              <li><div class="step-text">Open the <strong>Google Play Store</strong> on your Chromebook (most Chromebooks support Android apps).</div></li>
+              <li><div class="step-text">Install your VPN provider's official Android app (e.g. NordVPN, ExpressVPN, ProtonVPN, Mullvad) and log in — no manual cert setup needed.</div></li>
+              <li><div class="step-text">Or install <strong>OpenVPN for Android</strong> (free, open source) and import your <code>.ovpn</code> file directly into it.</div></li>
+            </ol>
+            <span class="fix-label">→ Option 2: OpenVPN Chrome extension</span>
+            <ol class="steps">
+              <li><div class="step-text">Search the Chrome Web Store for <strong>"OpenVPN"</strong> — your VPN provider may have an official extension.</div></li>
+              <li><div class="step-text">Install it and import your <code>.ovpn</code> file — the extension handles all the advanced options the native client can't.</div></li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- 10 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔑</span>
+            <span class="acc-title">I also need to import a client key (.key file) — how?</span>
+            <span class="acc-badge badge-info">setup</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>Client keys (<code>.key</code> files) are private keys — they're <strong>not</strong> imported into the certificate store. They're handled differently depending on the method:</p>
+            <span class="fix-label">→ Using built-in ChromeOS VPN</span>
+            <ol class="steps">
+              <li><div class="step-text">In the <strong>Add VPN</strong> dialog, look for a field labeled <strong>User certificate</strong> — this is where you select your client certificate (the <code>.crt</code> extracted from the <code>&lt;cert&gt;</code> block).</div></li>
+              <li><div class="step-text">The private key from the <code>&lt;key&gt;</code> block is typically bundled inside a <strong>PKCS#12 (.p12)</strong> file. If your VPN provider gives you a <code>.p12</code>, import that at <code>chrome://certificate-manager/</code> under <strong>Your certificates</strong>.</div></li>
+            </ol>
+            <span class="fix-label">→ Easier route</span>
+            <ol class="steps">
+              <li><div class="step-text">Use the <strong>OpenVPN for Android</strong> app on your Chromebook — it accepts the entire <code>.ovpn</code> file including embedded <code>&lt;key&gt;</code> blocks, so no separate import is needed.</div></li>
+            </ol>
+            <div class="note warn">⚠ Never share your <code>.key</code> / private key content with anyone or upload it to any website.</div>
+          </div>
+        </div>
+
+        <!-- 11 -->
+        <div class="acc-item" onclick="toggleAcc(this)">
+          <div class="acc-header">
+            <span class="acc-icon">🔄</span>
+            <span class="acc-title">Nothing worked — how do I fully reset and start over?</span>
+            <span class="acc-badge badge-warn">reset</span>
+            <span class="acc-chevron">▼</span>
+          </div>
+          <div class="acc-body">
+            <p>If you've gotten into a messy state, here's how to cleanly start from scratch:</p>
+            <span class="fix-label">→ Clean slate</span>
+            <ol class="steps">
+              <li><div class="step-text">Go to <code>chrome://certificate-manager/</code> → <strong>Authorities</strong> tab. Find any partially-imported certificates from your VPN, click <strong>⋮ → Delete</strong>.</div></li>
+              <li><div class="step-text">Go to <strong>Settings → Network → VPN</strong>. Remove any broken VPN entries using the <strong>⋮ → Forget</strong> option.</div></li>
+              <li><div class="step-text">Restart your Chromebook (<strong>Alt + Shift + R</strong> in the launcher, or power off and on).</div></li>
+              <li><div class="step-text">Come back here, re-upload your <code>.ovpn</code> file, download a fresh <code>.crt</code>, and follow <strong>Method B</strong> (Settings UI tab) from the beginning.</div></li>
+            </ol>
+            <div class="note ok">✅ Still stuck? Try the <strong>Android app route</strong> (see "ChromeOS VPN doesn't support my features" above) — it bypasses the native cert system entirely and is often much simpler.</div>
+          </div>
+        </div>
+
+      </div><!-- end accordion -->
+    </div><!-- end tab-support -->
+
+  </div>
+
+</div>
+
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragging');
+    if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+  function extractBlock(text, tag) {
+    const re = new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'gi');
+    const matches = text.match(re) || [];
+    return matches.map(m => {
+      const inner = m.replace(new RegExp(`^<${tag}>\\s*`, 'i'), '').replace(new RegExp(`\\s*<\\/${tag}>$`, 'i'), '').trim();
+      return inner;
+    });
+  }
+
+  function wrapAsPem(raw, type = 'CERTIFICATE') {
+    if (raw.includes('-----BEGIN')) return raw;
+    return `-----BEGIN ${type}-----\n${raw}\n-----END ${type}-----`;
+  }
+
+  function processFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target.result;
+      const caCerts = extractBlock(text, 'ca');
+      const clientCerts = extractBlock(text, 'cert');
+
+      document.getElementById('uploadCard').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+
+      const statusBar = document.getElementById('statusBar');
+      const certList = document.getElementById('certList');
+      certList.innerHTML = '';
+
+      const total = caCerts.length + clientCerts.length;
+
+      if (total === 0) {
+        statusBar.innerHTML = `<div class="status-bar status-warn"><div class="dot"></div> No embedded certificates found in <strong>${file.name}</strong>. The file may reference external cert files.</div>`;
+        certList.innerHTML = `<div class="none-found">No <code>&lt;ca&gt;</code> or <code>&lt;cert&gt;</code> blocks were found in this file.<br><br>Your .ovpn may use <code>ca /path/to/ca.crt</code> — look for that referenced file instead.</div>`;
+        document.getElementById('instructionsCard').style.display = 'none';
+        return;
+      }
+
+      statusBar.innerHTML = `<div class="status-bar status-ok"><div class="dot"></div> Parsed <strong>${file.name}</strong> — found ${caCerts.length} CA cert${caCerts.length !== 1 ? 's' : ''}${clientCerts.length ? `, ${clientCerts.length} client cert${clientCerts.length !== 1 ? 's' : ''}` : ''}.</div>`;
+
+      caCerts.forEach((pem, i) => renderCert(certList, pem, `CA Certificate${caCerts.length > 1 ? ` #${i+1}` : ''}`, 'ca', i, file.name, false));
+      clientCerts.forEach((pem, i) => renderCert(certList, pem, `Client Certificate${clientCerts.length > 1 ? ` #${i+1}` : ''}`, 'cert', i, file.name, true));
+    };
+    reader.readAsText(file);
+  }
+
+  function renderCert(container, rawPem, label, type, idx, filename, isClient) {
+    const pem = wrapAsPem(rawPem);
+    const div = document.createElement('div');
+    div.className = `cert-block${isClient ? ' client' : ''}`;
+
+    const baseName = filename.replace(/\.(ovpn|conf|txt)$/i, '');
+    const suffix = type === 'ca' ? (idx > 0 ? `_ca${idx+1}` : '_ca') : `_client_cert${idx > 0 ? idx+1 : ''}`;
+    const crtName = baseName + suffix + '.crt';
+
+    div.innerHTML = `
+      <div class="cert-label">🔑 ${label}</div>
+      <div class="cert-preview">${escapeHtml(pem)}</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="downloadCert(${JSON.stringify(pem)}, ${JSON.stringify(crtName)})">⬇ Download .crt</button>
+        <button class="btn btn-secondary" onclick="copyCert(${JSON.stringify(pem)}, this)">📋 Copy PEM</button>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  function downloadCert(pem, filename) {
+    const blob = new Blob([pem], { type: 'application/x-pem-file' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyCert(pem, btn) {
+    navigator.clipboard.writeText(pem).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.textContent = orig, 1800);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  function toggleAcc(item) {
+    const wasOpen = item.classList.contains('open');
+    // close all in same accordion
+    item.closest('.accordion').querySelectorAll('.acc-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) item.classList.add('open');
+  }
+
+  function resetTool() {
+    document.getElementById('uploadCard').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('instructionsCard').style.display = 'block';
+    fileInput.value = '';
+  }
+</script>
+</body>
+</html>
