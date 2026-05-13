@@ -886,23 +886,55 @@ key /etc/openvpn/client.key</code>
     const suffix = type === 'ca' ? (idx > 0 ? `_ca${idx+1}` : '_ca') : `_client_cert${idx > 0 ? idx+1 : ''}`;
     const crtName = baseName + suffix + '.crt';
 
+    // Auto-import MIME type — Chrome intercepts x509 blobs and opens native cert dialog
+    const mimeType = isClient ? 'application/x-x509-user-cert' : 'application/x-x509-ca-cert';
+    // data: URI fallback download
+    const dataUri = 'data:application/x-pem-file;charset=utf-8,' + encodeURIComponent(pem);
+
+    div.className = `cert-block${isClient ? ' client' : ''}`;
     div.innerHTML = `
       <div class="cert-label">🔑 ${label}</div>
       <div class="cert-preview">${escapeHtml(pem)}</div>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="downloadCert(${JSON.stringify(pem)}, ${JSON.stringify(crtName)})">⬇ Download .crt</button>
-        <button class="btn btn-secondary" onclick="copyCert(${JSON.stringify(pem)}, this)">📋 Copy PEM</button>
+        <button class="btn btn-primary" onclick="autoImport(${JSON.stringify(pem)}, '${mimeType}', this)">⚡ Auto Import</button>
+        <a class="btn btn-secondary" href="${dataUri}" download="${escapeAttr(crtName)}">⬇ Download .crt</a>
+        <button class="btn btn-ghost" onclick="copyCert(${JSON.stringify(pem)}, this)">📋 Copy PEM</button>
+        <button class="btn btn-ghost" onclick="toggleRaw('raw-${idx}-${type}')">📄 Raw text</button>
+      </div>
+      <div id="raw-${idx}-${type}" style="display:none;margin-top:0.9rem;">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem;">
+          Copy everything below → paste into a text editor → save as <code>${escapeHtml(crtName)}</code>
+        </div>
+        <textarea readonly onclick="this.select()" style="width:100%;height:160px;background:#060810;border:1px solid var(--border);color:var(--accent);font-family:var(--mono);font-size:0.7rem;padding:0.75rem;border-radius:6px;resize:vertical;line-height:1.5;">${escapeHtml(pem)}</textarea>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;">💡 Click the text area to select all, then <strong style="color:var(--text)">Ctrl+C</strong> to copy.</div>
       </div>
     `;
     container.appendChild(div);
   }
 
-  function downloadCert(pem, filename) {
-    const blob = new Blob([pem], { type: 'application/x-pem-file' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+  function autoImport(pem, mimeType, btn) {
+    try {
+      const blob = new Blob([pem], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      // Navigate to the blob — Chrome/ChromeOS intercepts x509 MIME types
+      // and opens the native certificate import dialog directly
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      btn.textContent = '✅ Dialog should open...';
+      setTimeout(() => { btn.innerHTML = '⚡ Auto Import'; }, 4000);
+    } catch(e) {
+      btn.textContent = '❌ Blocked — use Download instead';
+      setTimeout(() => { btn.innerHTML = '⚡ Auto Import'; }, 3000);
+    }
+  }
+
+  function toggleRaw(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function escapeAttr(s) {
+    return s.replace(/"/g, '&quot;');
   }
 
   function copyCert(pem, btn) {
