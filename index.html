@@ -390,6 +390,106 @@
   }
   .reset-btn:hover { color: var(--text); }
 
+  /* CERT PICKER */
+  .cert-picker {
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    animation: slideDown 0.18s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .picker-label {
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.75rem 1rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .picker-options { display: flex; flex-direction: column; }
+
+  .pick-card {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.13s;
+    text-decoration: none;
+  }
+  .pick-card:last-child { border-bottom: none; }
+  .pick-card:hover { background: rgba(255,255,255,0.04); }
+
+  .download-card { cursor: default; }
+  .download-card:hover { background: transparent; }
+
+  .pick-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+  }
+
+  .pick-info { flex: 1; }
+
+  .pick-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.2rem;
+  }
+
+  .pick-desc {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .pick-arrow {
+    font-size: 0.85rem;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: transform 0.15s, color 0.15s;
+  }
+  .pick-card:hover .pick-arrow { color: var(--accent); transform: translateX(3px); }
+
+  .pick-dl-link {
+    text-decoration: none;
+    padding: 0.35rem 0.8rem;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: var(--sans);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .pick-dl-link:hover { background: rgba(0,229,255,0.2); transform: none; }
+
+  .pick-status {
+    margin: 0.5rem 1rem 0.75rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 7px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .pick-status.status-ok   { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: var(--success); }
+  .pick-status.status-warn { background: rgba(255,171,64,0.08); border: 1px solid rgba(255,171,64,0.2); color: var(--warn); }
+
   /* ACCORDION */
   .accordion { display: flex; flex-direction: column; gap: 0.6rem; }
 
@@ -895,36 +995,77 @@ key /etc/openvpn/client.key</code>
     div.innerHTML = `
       <div class="cert-label">🔑 ${label}</div>
       <div class="cert-preview">${escapeHtml(pem)}</div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="autoImport(${JSON.stringify(pem)}, '${mimeType}', this)">⚡ Auto Import</button>
-        <a class="btn btn-secondary" href="${dataUri}" download="${escapeAttr(crtName)}">⬇ Download .crt</a>
+
+      <div class="btn-row" style="margin-top:1rem;">
+        <button class="btn btn-primary" onclick="togglePicker('picker-${idx}-${type}', this)">Get Certificate ▾</button>
         <button class="btn btn-ghost" onclick="copyCert(${JSON.stringify(pem)}, this)">📋 Copy PEM</button>
-        <button class="btn btn-ghost" onclick="toggleRaw('raw-${idx}-${type}')">📄 Raw text</button>
       </div>
-      <div id="raw-${idx}-${type}" style="display:none;margin-top:0.9rem;">
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem;">
-          Copy everything below → paste into a text editor → save as <code>${escapeHtml(crtName)}</code>
+
+      <div id="picker-${idx}-${type}" class="cert-picker" style="display:none;">
+        <div class="picker-label">How do you want to install this certificate?</div>
+        <div class="picker-options">
+
+          <div class="pick-card" onclick="autoImport(${JSON.stringify(pem)}, '${mimeType}', 'status-${idx}-${type}')">
+            <div class="pick-icon">⚡</div>
+            <div class="pick-info">
+              <div class="pick-title">Auto Import</div>
+              <div class="pick-desc">Opens Chrome's native certificate import dialog instantly — recommended for Chromebook</div>
+            </div>
+            <div class="pick-arrow">→</div>
+          </div>
+
+          <div class="pick-card download-card">
+            <div class="pick-icon">⬇</div>
+            <div class="pick-info">
+              <div class="pick-title">Download .crt file</div>
+              <div class="pick-desc">Save as a file, then import manually via Files app or Certificate Manager</div>
+            </div>
+            <a class="pick-arrow pick-dl-link" href="${dataUri}" download="${escapeAttr(crtName)}">Save →</a>
+          </div>
+
+          <div class="pick-card" onclick="toggleRaw('raw-${idx}-${type}')">
+            <div class="pick-icon">📄</div>
+            <div class="pick-info">
+              <div class="pick-title">Copy / Raw text</div>
+              <div class="pick-desc">Show the PEM text to copy-paste into a text editor and save manually</div>
+            </div>
+            <div class="pick-arrow">→</div>
+          </div>
+
         </div>
-        <textarea readonly onclick="this.select()" style="width:100%;height:160px;background:#060810;border:1px solid var(--border);color:var(--accent);font-family:var(--mono);font-size:0.7rem;padding:0.75rem;border-radius:6px;resize:vertical;line-height:1.5;">${escapeHtml(pem)}</textarea>
-        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;">💡 Click the text area to select all, then <strong style="color:var(--text)">Ctrl+C</strong> to copy.</div>
+        <div id="status-${idx}-${type}" class="pick-status" style="display:none;"></div>
+        <div id="raw-${idx}-${type}" style="display:none;margin-top:0.85rem;">
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem;">
+            Click to select all → <strong style="color:var(--text)">Ctrl+C</strong> to copy → paste into text editor → save as <code>${escapeHtml(crtName)}</code>
+          </div>
+          <textarea readonly onclick="this.select()" style="width:100%;height:150px;background:#060810;border:1px solid var(--border);color:var(--accent);font-family:var(--mono);font-size:0.7rem;padding:0.75rem;border-radius:6px;resize:vertical;line-height:1.5;">${escapeHtml(pem)}</textarea>
+        </div>
       </div>
     `;
     container.appendChild(div);
   }
 
-  function autoImport(pem, mimeType, btn) {
+  function togglePicker(id, btn) {
+    const el = document.getElementById(id);
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? 'Get Certificate ▾' : 'Get Certificate ▴';
+  }
+
+  function autoImport(pem, mimeType, statusId) {
+    const status = document.getElementById(statusId);
     try {
       const blob = new Blob([pem], { type: mimeType });
       const url = URL.createObjectURL(blob);
-      // Navigate to the blob — Chrome/ChromeOS intercepts x509 MIME types
-      // and opens the native certificate import dialog directly
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 10000);
-      btn.textContent = '✅ Dialog should open...';
-      setTimeout(() => { btn.innerHTML = '⚡ Auto Import'; }, 4000);
+      status.style.display = 'block';
+      status.className = 'pick-status status-ok';
+      status.innerHTML = '✅ Import dialog should be opening in a new tab. If nothing appeared, check your popup blocker and allow popups for this page, then try again.';
     } catch(e) {
-      btn.textContent = '❌ Blocked — use Download instead';
-      setTimeout(() => { btn.innerHTML = '⚡ Auto Import'; }, 3000);
+      status.style.display = 'block';
+      status.className = 'pick-status status-warn';
+      status.innerHTML = '❌ Auto import was blocked. Use <strong>Download .crt</strong> instead and import it manually.';
     }
   }
 
